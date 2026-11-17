@@ -5,13 +5,22 @@
   <div class="flash-ok">版本 #{{ version.id }} 发布成功：区间 {{ version.month1 }} ~ {{ version.month2 }}，
     明细与月合计已在同一事务落库。</div>
   {% endif %}
+  {% if not version.is_loadable %}
+  <div class="banner-warn"><strong>该版本不可用于装载：</strong>
+    明细或月合计中包含非有限值（NaN/Infinity），来自发布时尚未更正的异常读数。
+    版本内容与下载永久保留，但请勿装载入数仓；请先到
+    <a href="/corrections">异常读数更正</a> 修复读数后重新发布，生成可装载新版本。</div>
+  {% endif %}
 {% endblock %}
 {% block content %}
 <div class="card">
   <h2>版本 #{{ version.id }}：{{ version.month1 }} ~ {{ version.month2 }}（UTC 月）</h2>
   <p class="muted">发布时间：{{ version.created_at }} ｜ 读数状态指纹：<code>{{ version.state_hash }}</code>
+    <br>装载标记：
+    {% if version.is_loadable %}<span class="pill ok">可装载（明细与合计全部有限）</span>
+    {% else %}<span class="pill bad">不可装载（含 NaN/Infinity，仅供留存与核对）</span>{% endif %}
     {% if version.state_hash != current_hash %}
-    <br><strong>注意：</strong>该指纹与当前读数不一致，说明发布后又有补传；本版本内容保持不变，可重新发布生成新版本。
+    <br><strong>注意：</strong>该指纹与当前读数不一致，说明发布后又有补传或更正；本版本内容保持不变，可重新发布生成新版本。
     {% endif %}
   </p>
   <p>
@@ -24,9 +33,15 @@
 <div class="card">
   <h2>月合计</h2>
   <table>
-    <tr><th>用量月份 (UTC)</th><th>合计 kWh</th></tr>
+    <tr><th>用量月份 (UTC)</th><th>合计 kWh</th><th>是否有限</th></tr>
     {% for t in totals %}
-    <tr><td>{{ t.usage_month }}</td><td>{{ t.total_kwh }}</td></tr>
+    <tr>
+      <td>{{ t.usage_month }}</td>
+      <td>{% if t.total_kwh is number and t.total_kwh|abs <= 1e308 %}{{ t.total_kwh }}
+          {% else %}<span class="num-bad">{{ t.total_kwh }}（非有限）</span>{% endif %}</td>
+      <td>{% if t.total_kwh is number and t.total_kwh|abs <= 1e308 %}
+          <span class="pill ok">有限</span>{% else %}<span class="pill bad">非有限</span>{% endif %}</td>
+    </tr>
     {% endfor %}
   </table>
 </div>
@@ -39,8 +54,13 @@
     {% for d in details %}
     <tr>
       <td>{{ d.usage_month }}</td><td>{{ d.start_ts }}</td><td>{{ d.end_ts }}</td>
-      <td>{{ d.period_no }}</td><td>{{ d.start_cumulative }}</td>
-      <td>{{ d.end_cumulative }}</td><td>{{ d.usage_kwh }}</td>
+      <td>{{ d.period_no }}</td>
+      <td>{% if d.start_cumulative is number and d.start_cumulative|abs <= 1e308 %}{{ d.start_cumulative }}
+          {% else %}<span class="num-bad">{{ d.start_cumulative }}</span>{% endif %}</td>
+      <td>{% if d.end_cumulative is number and d.end_cumulative|abs <= 1e308 %}{{ d.end_cumulative }}
+          {% else %}<span class="num-bad">{{ d.end_cumulative }}</span>{% endif %}</td>
+      <td>{% if d.usage_kwh is number and d.usage_kwh|abs <= 1e308 %}{{ d.usage_kwh }}
+          {% else %}<span class="num-bad">{{ d.usage_kwh }}（非有限）</span>{% endif %}</td>
     </tr>
     {% else %}
     <tr><td colspan="7" class="muted">该区间内没有可计算的同周期相邻差额。</td></tr>

@@ -4,21 +4,24 @@
 <div class="card">
   <h2>全部发布版本（旧版永久保留）</h2>
   <p class="muted">当前读数状态指纹：<code>{{ current_hash }}</code>。
-    版本指纹与当前一致表示该版本基于最新读数；不一致说明发布后又有补传。</p>
+    版本指纹与当前一致表示该版本基于最新读数；不一致说明发布后又有补传或更正。
+    “不可装载”版本含非有限用量（NaN/Infinity），仅供留存核对，下载文件内亦含 WARNING 注释行。</p>
   <table>
-    <tr><th>版本</th><th>区间（UTC 月）</th><th>状态指纹</th><th>发布时间</th>
-        <th>指纹匹配当前读数</th><th>操作</th></tr>
+    <tr><th>版本</th><th>区间（UTC 月）</th><th>状态指纹</th><th>装载标记</th>
+        <th>发布时间</th><th>指纹匹配当前读数</th><th>操作</th></tr>
     {% for v in versions %}
     <tr>
       <td>#{{ v.id }}</td><td>{{ v.month1 }} ~ {{ v.month2 }}</td>
       <td><code>{{ v.state_hash[:16] }}…</code></td>
+      <td>{% if v.is_loadable %}<span class="pill ok">可装载</span>
+          {% else %}<span class="pill bad">不可装载</span>{% endif %}</td>
       <td class="muted">{{ v.created_at }}</td>
       <td>{% if v.state_hash == current_hash %}<span class="pill ok">一致</span>
-          {% else %}<span class="pill bad">已被后续补传超越</span>{% endif %}</td>
+          {% else %}<span class="pill warn">已被后续补传/更正超越</span>{% endif %}</td>
       <td><a href="/versions/{{ v.id }}">查看 / 下载</a></td>
     </tr>
     {% else %}
-    <tr><td colspan="6" class="muted">尚无发布版本。</td></tr>
+    <tr><td colspan="7" class="muted">尚无发布版本。</td></tr>
     {% endfor %}
   </table>
 </div>

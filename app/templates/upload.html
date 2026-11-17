@@ -9,16 +9,25 @@
   {% endif %}
 {% endblock %}
 {% block content %}
+{% if non_finite_cnt > 0 %}
+<div class="banner-warn">
+  当前有 <strong class="num-bad">{{ non_finite_cnt }}</strong> 条已入库的非有限读数
+  （Infinity/NaN，来自历史异常上传），会使发布版本不可装载。
+  请到 <a href="/corrections">异常读数更正</a> 页面下载/整理同三列更正 CSV 替换为有限值。
+</div>
+{% endif %}
 <div class="card">
-  <h2>上传总表累计读数 CSV</h2>
+  <h2>上传总表累计读数 CSV（普通上传）</h2>
   <p class="muted">
     CSV 需为 UTF-8 编码，表头必须包含 UTC 时间、表计周期号、累计 kWh 三列
     （支持表头：<code>ts/utc_time</code>、<code>period_no</code>、<code>cumulative_kwh</code> 等）。
     时间需带时区（如 <code>2026-01-01T00:00:00Z</code>），统一按 UTC 处理。
   </p>
   <ul class="muted">
+    <li>累计 kWh 必须是<strong>有限数值</strong>：含 <code>NaN</code>/<code>Infinity</code>（含 <code>-Infinity</code>）的文件整批拒收，一条都不会入库；</li>
     <li>同刻同内容重传 → 幂等跳过，不重复入库；</li>
-    <li>同刻异内容、同周期读数倒退 → 整批拒收，库内读数不变；</li>
+    <li>同刻异内容、同周期读数倒退 → 整批拒收，库内读数不变；正常读数的异值重传同样拒绝；</li>
+    <li>已入库的异常（非有限）读数只能经 <a href="/corrections">异常读数更正</a> 替换，普通上传无法改写；</li>
     <li>换表（周期号变化）相邻读数不计算差额，不估算用量。</li>
   </ul>
   <form action="/upload" method="post" enctype="multipart/form-data">
@@ -28,7 +37,7 @@
 </div>
 
 <div class="card">
-  <h2>上传批次记录（最近 20 条）</h2>
+  <h2>普通上传批次记录（最近 20 条）</h2>
   <table>
     <tr><th>#</th><th>文件</th><th>状态</th><th>入库</th><th>跳过</th><th>说明</th><th>时间</th></tr>
     {% for b in batches %}

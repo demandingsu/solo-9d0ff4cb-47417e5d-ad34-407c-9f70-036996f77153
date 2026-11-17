@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}异常读数更正 - 园区总表用量发布平台{% endblock %}
+{% block flashes %}
+  {% if request.query_params.get('ok') %}
+  <div class="flash-ok">更正成功：已将 {{ request.query_params.get('corrected') }} 条非有限读数
+    替换为有限值。原上传批次与更正来源均已保留，可重新发布生成可装载新版本。</div>
+  {% elif request.query_params.get('err') %}
+  <div class="flash-err">更正整批拒收，读数与更正记录均未发生任何变化（无部分写入）。
+    原因：{{ request.query_params.get('msg') }}</div>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>异常（非有限）读数更正</h2>
+  <p class="muted">
+    更正 CSV 与普通上传<strong>完全相同的三列</strong>（UTC 时间、表计周期号、累计 kWh），
+    仅可把<strong>已入库的非有限读数</strong>（Infinity/NaN）替换为有限值：
+  </p>
+  <ul class="muted">
+    <li>每行必须命中下面列出的某条待更正读数；命中正常有限读数（异值重传）或查无此读数 → 整批拒收；</li>
+    <li>更正值本身必须有限，含 NaN/Infinity 的更正文件整批拒收；</li>
+    <li>替换后会与其他全部读数一起复核同周期单调性，倒退 → 整批拒收；</li>
+    <li>读数原行原地更新，原上传批次保留；更正来源批次与替换前后的值记入更正溯源；</li>
+    <li>任一更正无效或写入失败：整个事务回滚，不留部分读数，也不留更正记录。</li>
+  </ul>
+  <form action="/corrections" method="post" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv" required>
+    <button class="btn" type="submit">提交更正 CSV</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>待更正的非有限读数（{{ pending|length }} 条）</h2>
+  <table>
+    <tr><th>读数 #</th><th>UTC 时间</th><th>周期号</th><th>当前累计值</th>
+        <th>原上传批次</th><th>更正 CSV 示例行</th></tr>
+    {% for r in pending %}
+    <tr>
+      <td>{{ r.id }}</td><td>{{ r.ts }}</td><td>{{ r.period_no }}</td>
+      <td class="num-bad">{{ r.cumulative }}</td>
+      <td>#{{ r.batch_id }}（{{ r.filename }}）</td>
+      <td><code>{{ r.ts }}Z,{{ r.period_no }},&lt;有限累计值&gt;</code></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted">没有待更正的非有限读数，全部读数均为有限值。</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>更正批次记录（最近 20 条）</h2>
+  <table>
+    <tr><th>#</th><th>文件</th><th>状态</th><th>更正条数</th><th>说明</th><th>时间</th></tr>
+    {% for b in batches %}
+    <tr>
+      <td>{{ b.id }}</td><td>{{ b.filename }}</td>
+      <td>{% if b.status == 'accepted' %}<span class="pill ok">接受</span>
+          {% else %}<span class="pill bad">拒收</span>{% endif %}</td>
+      <td>{{ b.corrected_cnt }}</td>
+      <td>{{ b.message }}</td><td class="muted">{{ b.created_at }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted">还没有更正批次记录。</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>更正溯源（最近 50 条）</h2>
+  <table>
+    <tr><th>#</th><th>读数 #</th><th>原上传批次</th><th>更正来源批次</th>
+        <th>替换前</th><th>替换后</th><th>更正时间</th></tr>
+    {% for h in history %}
+    <tr>
+      <td>{{ h.id }}</td><td>{{ h.reading_id }}</td>
+      <td>#{{ h.original_batch_id }}（{{ h.original_filename }}）</td>
+      <td>#{{ h.correction_batch_id }}（{{ h.correction_filename }}）</td>
+      <td class="num-bad">{{ h.old_cumulative }}</td>
+      <td>{{ h.new_cumulative }}</td>
+      <td class="muted">{{ h.created_at }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="muted">尚无更正记录。</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
